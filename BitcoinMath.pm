@@ -16,11 +16,11 @@ sub reverse_map {
 
 our @decBase58 = reverse_map;
 
-sub big_zero { use bigint; 0 }
+sub big_zero {use bigint; 0}
 
 sub decodeBase58 {
-	my $base58     = $_[0];
-	my $return     = big_zero;
+	my $base58 = $_[0];
+	my $return = big_zero;
 	for (my $i = 0; $i < length($base58); $i++) {
 		my $sym = ord(substr($base58, $i, 1));
 		$return *= 58;
@@ -42,7 +42,7 @@ sub encodeBase58 {
 		die("encodeBase58: uneven number of hex characters");
 	}
 	my $hex = big_zero;
-	for(my $i = 0; $i < length($orighex); ++$i) {
+	for (my $i = 0; $i < length($orighex); ++$i) {
 		$hex = $hex * 16 + hex(substr($orighex, $i, 1));
 	}
 	my $return = "";
@@ -66,7 +66,7 @@ sub checksum {
 }
 
 sub checkBitcoinAddress {
-	my $_ = shift;
+	local $_ = shift;
 	die 'wrong format' unless /^[@base58]{34,}$/x;
 	$_ = decodeBase58 $_;
 	my $checksum = checksum sprintf '%042s', substr $_, 0, -8;
@@ -75,7 +75,7 @@ sub checkBitcoinAddress {
 
 sub hash160ToAddress {
 	my ($hash, $version) = ($_[0], (sprintf '%02x', $_[1] || 0));
-	my $_ = sprintf '%34s', map encodeBase58($_ . checksum($_)), $version . $hash;
+	local $_ = sprintf '%34s', map encodeBase58($_ . checksum($_)), $version . $hash;
 	tr/ /1/;
 	return $_;
 }
@@ -93,6 +93,20 @@ sub addressToHash160 {
 
 sub pubKeyToAddress {
 	return hash160ToAddress(hash160($_[0]));
+}
+
+sub generateKeyAddressPair {
+	my $mode;
+	my %sd;
+	for (`openssl ecparam -genkey -name secp256k1 -noout |openssl ec -text 2>/dev/null`) {
+		chomp;
+		if    (/^priv:/) {$mode = "priv"; next}
+		elsif (/^pub:/)  {$mode = "pub";  next}
+		elsif (/^\S/)    {$mode = ""}
+		if ($mode) {s/[\s:]//g; $sd{$mode} .= uc $_}
+	}
+	$sd{priv} = '80' . $sd{priv} if $sd{priv} !~ s/^00/80/;
+	return (encodeBase58($sd{priv} . checksum($sd{priv})), pubKeyToAddress($sd{pub}));
 }
 
 1;
