@@ -4,6 +4,7 @@ use strict;
 use warnings;
 use JSON;
 use LWP::UserAgent;
+use HTTP::Request::Common;
 use Carp;
 use Sub::Name;
 
@@ -21,36 +22,36 @@ sub new {
 	  },
 	  $class;
 	$obj->{url} = "http://$obj->{host}:$obj->{port}/";
-	$obj->{lwp}->credentials("$obj->{host}:$obj->{port}", 'jsonrpc', $obj->{user}, $obj->{password});
+	$obj->{lwp}->credentials("$obj->{host}:$obj->{port}", 'jsonrpc', $obj->{user}, $obj->{password})
+	  if $obj->{lwp}->can("credentials");
 	$obj;
 }
 
 sub DESTROY { }
 
 sub _call {
-	my ($self, %args) = @_;
-	my $content = encode_json({
-			method => $args{method},
-			params => $args{params},
-			id     => rand
-		}
-	);
-	my $resp = $self->{lwp}->post(
-		$self->{url},
+	my ($self, $method, $params) = @_;
+	my $resp = $self->{lwp}->request(
+		POST $self->{url},
 		Content_Type => 'application/json',
-		Content      => $content,
 		Accept       => 'application/json',
+		Content      => encode_json({
+				method => $method,
+				params => $params,
+				id     => rand
+			}
+		)
 	);
 	return decode_json($resp->decoded_content) if $resp && $resp->is_success;
-	croak {error => "undefined response"} if not $resp;
-	croak {error => "unsuccessful response: " . $resp->status_line};
+	croak "undefined response" if not $resp;
+	croak "unsuccessful response: " . $resp->status_line;
 }
 
 sub AUTOLOAD {
 	my $func = $AUTOLOAD;
 	$func =~ s/.*:://;
 	no strict 'refs';
-	*{$func} = subname "$AUTOLOAD" => eval "sub { \$_[0]->_call(method => '$func', params => [\@_[1 .. \$#_]]) }";
+	*{$func} = subname "$AUTOLOAD" => eval "sub { \$_[0]->_call('$func', [\@_[1 .. \$#_]]) }";
 	goto &$func;
 }
 
