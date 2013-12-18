@@ -38,26 +38,19 @@ sub decodeBase58 {
 
 sub encodeBase58 {
 	my $orighex = $_[0];
-	if (length($orighex) % 2 != 0) {
-		die("encodeBase58: uneven number of hex characters");
-	}
+	die "encodeBase58: uneven number of hex characters" if length($orighex) % 2 != 0;
 	my $hex = big_zero;
 	for (my $i = 0; $i < length($orighex); ++$i) {
 		$hex = $hex * 16 + hex(substr($orighex, $i, 1));
 	}
 	my $return = "";
-	while ($hex > 0) {
-		my $dv  = $hex / 58;
-		my $rem = $hex % 58;
-		$hex    = $dv;
-		$return = $return . $base58[$rem];
+	for (; $hex > 0; $hex /= 58) {
+		$return .= $base58[$hex % 58];
 	}
 	$return = reverse($return);
-
 	for (my $i = 0; $i < length($orighex) && substr($orighex, $i, 2) eq "00"; $i += 2) {
 		$return = "1" . $return;
 	}
-
 	return $return;
 }
 
